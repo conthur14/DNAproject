@@ -5,7 +5,7 @@
 TEAM MEMBERS
 ------------
   Connor Thurston (cmt012)
-  AJ Mehta (ahm057)
+  AJ Mehta (ajm057)
   Genesis Evbenaye (oae001)
   Anna Barrios (aeb036)
 
