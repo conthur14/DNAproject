@@ -4,9 +4,9 @@
 \usepackage{booktabs}
 \usepackage[margin=1in]{geometry}
 
-\title{CSCI 311.S26 -- DNA Project -- Team 6}
-\author{Connor Thurston (cmt012), AJ Mehta (ahm057), Genesis Evbenaye (oae001), Anna Barrios (aeb036)}
-\date{March 24, 2026}
+\title{CSCI 311.S26 -- DNA Sequence Matching System}
+\author{Anna Barrios}
+\date{March 2026}
 
 \begin{document}
 
@@ -14,105 +14,113 @@
 
 \section{Introduction}
 
-This project implements a DNA sequence similarity search system. Given a query sequence $t$ and a database $D$ of known sequences in FASTA format, the program compares $t$ against every sequence in $D$ using a user-selected algorithm and reports the most similar match. The system is written in Python~3 and consists of three modules: a FASTA file parser (\texttt{file\_handler.py}), four dynamic programming algorithm implementations (\texttt{algorithms.py}), and a menu-driven command-line interface (\texttt{main.py}).
+This project develops a DNA sequence similarity search tool. Given a query sequence $t$ and a collection of known sequences $D$ stored in FASTA format, the program compares $t$ against each sequence in $D$ using a selected algorithm and returns the most similar result.
 
-The core logic follows the \textsc{FindMostSimilarSeq} pseudocode from the assignment: for each sequence $s_i$ in $D$, we compute a similarity score against $t$ and track the best match. All four algorithms operate in $O(mn)$ time, where $m$ and $n$ are the lengths of the two sequences being compared.
+The implementation is written in Python 3 and is organized into three main components: a file parsing module for handling FASTA input, a set of dynamic programming algorithms for sequence comparison, and a command-line interface that allows the user to select an algorithm and run the search.
 
-\section{Algorithm Descriptions and Analysis}
+The overall approach follows a simple structure: for every sequence $s_i$ in the database, compute a similarity score with $t$, track the highest score, and return the corresponding sequence. Each algorithm operates in $O(mn)$ time for sequences of lengths $m$ and $n$.
+
+\section{Algorithms and Analysis}
 
 \subsection{Longest Common Substring}
 
-This algorithm finds the longest contiguous block of characters that appears identically in both sequences $s$ and $t$. We use a standard 2D dynamic programming table where $\text{dp}[i][j]$ stores the length of the longest common substring ending at $s[i{-}1]$ and $t[j{-}1]$. The recurrence is:
+This method identifies the longest contiguous segment that appears in both sequences. A dynamic programming table is used where each entry stores the length of the matching substring ending at specific indices.
+
 \[
-\text{dp}[i][j] = 
+dp[i][j] =
 \begin{cases}
-\text{dp}[i{-}1][j{-}1] + 1 & \text{if } s[i{-}1] = t[j{-}1] \\
+dp[i-1][j-1] + 1 & \text{if } s[i-1] = t[j-1] \\
 0 & \text{otherwise}
 \end{cases}
 \]
-We track the global maximum across the entire table. A 2-row rolling optimization reduces space usage.
 
-\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(\min(m, n))$ with rolling rows
+The maximum value in the table represents the result.
 
-\textbf{Advantage:} Simple and fast. Identifies strong local matches where sequences share a conserved contiguous region.
+\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(\min(m,n))$
 
-\textbf{Disadvantage:} Requires exact contiguous matching. A single point mutation in the middle of an otherwise identical region breaks the substring in two, drastically reducing the score. Biologically, this is unrealistic since point mutations are common.
+\textbf{Strength:} Efficient and good at detecting strong local matches.
+
+\textbf{Limitation:} Requires exact contiguous matches. Even a single mismatch breaks the sequence, which is unrealistic for biological data.
 
 \subsection{Longest Common Subsequence (LCS)}
 
-The LCS algorithm generalizes the substring approach by allowing non-contiguous matches. Characters must appear in the same relative order but need not be adjacent. The recurrence is:
+The LCS algorithm allows matches that are not contiguous, as long as they appear in the same order. This is computed using dynamic programming with the recurrence:
+
 \[
-\text{dp}[i][j] = 
+dp[i][j] =
 \begin{cases}
-\text{dp}[i{-}1][j{-}1] + 1 & \text{if } s[i{-}1] = t[j{-}1] \\
-\max(\text{dp}[i{-}1][j],\; \text{dp}[i][j{-}1]) & \text{otherwise}
-\end{cases}
-\]
-We use a 2-row rolling optimization since each row depends only on the previous row.
-
-\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(\min(m, n))$ with rolling rows
-
-\textbf{Advantage:} More biologically meaningful than substring since it tolerates insertions and deletions between matching nucleotides. Captures overall conservation between sequences.
-
-\textbf{Disadvantage:} Does not penalize gaps. A very long sequence will always have a high LCS score with a shorter one simply because there are more characters to match against. In our tests, SARS-CoV-2 (3,822~nt) scored highest against the query (1,071~nt) despite being biologically unrelated, solely because of its length.
-
-\subsection{Edit Distance (Levenshtein)}
-
-Edit distance counts the minimum number of single-character insertions, deletions, and substitutions needed to transform $s$ into $t$. The recurrence is:
-\[
-\text{dp}[i][j] = 
-\begin{cases}
-\text{dp}[i{-}1][j{-}1] & \text{if } s[i{-}1] = t[j{-}1] \\
-1 + \min(\text{dp}[i{-}1][j],\; \text{dp}[i][j{-}1],\; \text{dp}[i{-}1][j{-}1]) & \text{otherwise}
-\end{cases}
-\]
-Since lower distance means higher similarity, we negate the result so it integrates with the \textsc{FindMostSimilarSeq} framework (higher score = more similar).
-
-\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(\min(m, n))$ with rolling rows
-
-\textbf{Advantage:} Accounts for all three types of mutations. Naturally handles sequences of different lengths. Correctly identified Rat Insulin~2 as the closest match in our tests.
-
-\textbf{Disadvantage:} All operations have uniform cost (1), which does not reflect biological reality where gaps are typically more costly than substitutions.
-
-\subsection{Needleman-Wunsch Global Alignment}
-
-The Needleman-Wunsch algorithm is the gold standard for global pairwise alignment in bioinformatics. We use the scoring scheme: $+1$ for a match, $-1$ for a mismatch, and $-2$ for a gap. The recurrence considers three moves at each cell:
-\[
-\text{dp}[i][j] = \max
-\begin{cases}
-\text{dp}[i{-}1][j{-}1] + \text{score}(s[i{-}1], t[j{-}1]) & \text{(diagonal: match/mismatch)} \\
-\text{dp}[i{-}1][j] + (-2) & \text{(up: gap in } t\text{)} \\
-\text{dp}[i][j{-}1] + (-2) & \text{(left: gap in } s\text{)}
+dp[i-1][j-1] + 1 & \text{if } s[i-1] = t[j-1] \\
+\max(dp[i-1][j], dp[i][j-1]) & \text{otherwise}
 \end{cases}
 \]
 
-\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(mn)$ for the full table
+\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(\min(m,n))$
 
-\textbf{Advantage:} The most biologically meaningful algorithm. By assigning different penalties to gaps versus mismatches, it produces scores that reflect real evolutionary divergence. It correctly identified Rat Insulin~2 with a score of $+615$, far above all other sequences, and appropriately penalized SARS-CoV-2 ($-4{,}473$) despite its length.
+\textbf{Strength:} More flexible than substring since it tolerates gaps.
 
-\textbf{Disadvantage:} Requires $O(mn)$ space for the full DP table (necessary for traceback). Slowest in practice (${\sim}10$ seconds for our dataset).
+\textbf{Limitation:} Does not penalize gaps, which can lead to inflated similarity scores for longer sequences.
 
-\section{Comparative Results}
+\subsection{Edit Distance}
 
-The table below summarizes the best match reported by each algorithm when searching the provided database (10~sequences) against the query sequence (1,071~nucleotides).
+Edit distance measures how many operations (insertions, deletions, substitutions) are needed to transform one sequence into another. The recurrence is:
 
-\begin{table}[h]
-\centering
-\begin{tabular}{@{}llrr@{}}
-\toprule
-\textbf{Algorithm} & \textbf{Best Match} & \textbf{Score} & \textbf{Time (s)} \\
-\midrule
-Longest Common Substring & Human Insulin & 47 & $\sim$3 \\
-LCS & SARS-CoV-2 Spike\textsuperscript{*} & 1052 & $\sim$5 \\
-Edit Distance & Rat Insulin 2 & $-$221 & $\sim$6 \\
-Needleman-Wunsch & Rat Insulin 2 & $+$615 & $\sim$10 \\
-\bottomrule
-\end{tabular}
-\caption{Best match per algorithm. \textsuperscript{*}LCS incorrectly favors SARS-CoV-2 due to its longer length (3,822~nt), demonstrating the flaw of not penalizing gaps.}
-\end{table}
+\[
+dp[i][j] =
+\begin{cases}
+dp[i-1][j-1] & \text{if } s[i-1] = t[j-1] \\
+1 + \min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]) & \text{otherwise}
+\end{cases}
+\]
 
-\section{Conclusion}
+To align with the system (higher = more similar), the value is negated.
 
-All four algorithms share $O(mn)$ time complexity but differ significantly in biological accuracy. The query sequence is derived from an insulin gene region, and the biologically correct best match is the Rat Insulin~2 gene. Only Edit Distance and Needleman-Wunsch correctly identified this match. Needleman-Wunsch produced the most decisive separation between the correct match and the rest of the database, confirming its status as the preferred method for global sequence alignment in bioinformatics.
+\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(\min(m,n))$
+
+\textbf{Strength:} Captures all types of mutations and handles sequences of different lengths well.
+
+\textbf{Limitation:} Assigns equal cost to all operations, which does not reflect biological differences between mutations.
+
+\subsection{Global Alignment (Needleman-Wunsch)}
+
+This algorithm computes an optimal global alignment using a scoring system. We use:
+\begin{itemize}
+    \item Match: +1
+    \item Mismatch: -1
+    \item Gap: -2
+\end{itemize}
+
+The recurrence is:
+
+\[
+dp[i][j] = \max
+\begin{cases}
+dp[i-1][j-1] + \text{score} & \text{(match/mismatch)} \\
+dp[i-1][j] - 2 & \text{(gap in } t\text{)} \\
+dp[i][j-1] - 2 & \text{(gap in } s\text{)}
+\end{cases}
+\]
+
+\textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(mn)$
+
+\textbf{Strength:} Produces the most realistic alignment by distinguishing between matches, mismatches, and gaps.
+
+\textbf{Limitation:} Uses more memory and is slower compared to other approaches.
+
+\section{System Structure}
+
+The system processes each sequence independently using the selected algorithm. For each sequence in the dataset, a similarity score is computed and compared to the current best score. The highest-scoring sequence is returned at the end of the search.
+
+This follows the standard formulation:
+\[
+\max_{s_i \in D} \text{Similarity}(s_i, t)
+\]
+
+\section{Discussion}
+
+All implemented methods have the same asymptotic time complexity, but they differ significantly in how they evaluate similarity.
+
+Simpler methods such as substring and LCS are faster and easier to implement but fail to fully capture biological relationships. Edit distance improves accuracy by modeling sequence transformations, while global alignment provides the most meaningful comparison by incorporating penalties for gaps and mismatches.
+
+Overall, the project highlights the tradeoff between computational efficiency and biological accuracy. More sophisticated algorithms produce better results but require greater computational resources.
 
 \end{document}
