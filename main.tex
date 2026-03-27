@@ -16,7 +16,15 @@
 
 This project implements a DNA sequence similarity search system. Given a query sequence $t$ and a database $D$ of known sequences in FASTA format, the program compares $t$ against every sequence in $D$ using a user-selected algorithm and reports the most similar match. The system is written in Python~3 and consists of three modules: a FASTA file parser (\texttt{file\_handler.py}), four dynamic programming algorithm implementations (\texttt{algorithms.py}), and a menu-driven command-line interface (\texttt{main.py}).
 
-The core logic follows the \textsc{FindMostSimilarSeq} pseudocode from the assignment: for each sequence $s_i$ in $D$, we compute a similarity score against $t$ and track the best match. All four algorithms operate in $O(mn)$ time, where $m$ and $n$ are the lengths of the two sequences being compared.
+The core logic follows the \textsc{FindMostSimilarSeq} pseudocode from the assignment: for each sequence $s_i$ in $D$, we compute a similarity score against $t$ using a \texttt{computeSim} function and track the best match. Each algorithm defines similarity differently, but all return a numeric score where higher values indicate greater similarity. For edit distance, the value is negated so that smaller distances correspond to higher similarity scores.
+
+Each pairwise comparison runs in $O(mn)$ time, where $m$ and $n$ are the lengths of the sequences being compared. Since the algorithm iterates over all sequences in the database, the overall runtime is $O(N \cdot m n)$, where $N$ is the number of sequences in $D$. This highlights that performance scales linearly with the size of the database.
+
+\section{System Design and File Handling}
+
+The program is organized into three modules to separate concerns and improve extensibility. The \texttt{file\_handler.py} module parses FASTA files by reading each line, identifying headers (lines beginning with $>$), and concatenating subsequent lines into full DNA sequences. This process runs in $O(T)$ time, where $T$ is the total number of characters in the file. Sequences are stored as strings, and case differences are normalized to ensure consistency.
+
+The \texttt{algorithms.py} module contains implementations of each similarity algorithm, all following a consistent interface so they can be easily swapped in the main program. The \texttt{main.py} module provides a menu-driven interface that allows the user to select an algorithm and execute the search. This modular design makes it straightforward to add additional algorithms without modifying the rest of the system.
 
 \section{Algorithm Descriptions and Analysis}
 
@@ -54,7 +62,7 @@ We use a 2-row rolling optimization since each row depends only on the previous 
 
 \textbf{Advantage:} More biologically meaningful than substring since it tolerates insertions and deletions between matching nucleotides. Captures overall conservation between sequences.
 
-\textbf{Disadvantage:} Does not penalize gaps. A very long sequence will always have a high LCS score with a shorter one simply because there are more characters to match against. In our tests, SARS-CoV-2 (3,822~nt) scored highest against the query (1,071~nt) despite being biologically unrelated, solely because of its length.
+\textbf{Disadvantage:} Does not penalize gaps. A very long sequence will always have a high LCS score with a shorter one simply because there are more characters to match against. In our tests, SARS-CoV-2 (3,822~nt) scored highest against the query (1,071~nt) despite being biologically unrelated, solely because of its length. This highlights a bias toward longer sequences when scores are not normalized.
 
 \subsection{Edit Distance (Levenshtein)}
 
@@ -88,7 +96,7 @@ The Needleman-Wunsch algorithm is the gold standard for global pairwise alignmen
 
 \textbf{Time:} $O(mn)$ \quad \textbf{Space:} $O(mn)$ for the full table
 
-\textbf{Advantage:} The most biologically meaningful algorithm. By assigning different penalties to gaps versus mismatches, it produces scores that reflect real evolutionary divergence. It correctly identified Rat Insulin~2 with a score of $+615$, far above all other sequences, and appropriately penalized SARS-CoV-2 ($-4{,}473$) despite its length.
+\textbf{Advantage:} The most biologically meaningful algorithm. By assigning a higher penalty to gaps than mismatches, the scoring discourages excessive insertions and deletions and produces alignments that better reflect evolutionary relationships. It correctly identified Rat Insulin~2 with a score of $+615$, far above all other sequences, and appropriately penalized SARS-CoV-2 ($-4{,}473$) despite its length.
 
 \textbf{Disadvantage:} Requires $O(mn)$ space for the full DP table (necessary for traceback). Slowest in practice (${\sim}10$ seconds for our dataset).
 
@@ -114,5 +122,7 @@ Needleman-Wunsch & Rat Insulin 2 & $+$615 & $\sim$10 \\
 \section{Conclusion}
 
 All four algorithms share $O(mn)$ time complexity but differ significantly in biological accuracy. The query sequence is derived from an insulin gene region, and the biologically correct best match is the Rat Insulin~2 gene. Only Edit Distance and Needleman-Wunsch correctly identified this match. Needleman-Wunsch produced the most decisive separation between the correct match and the rest of the database, confirming its status as the preferred method for global sequence alignment in bioinformatics.
+
+More broadly, this project demonstrates that algorithm choice significantly impacts results. Simpler methods may be faster but can produce misleading matches due to biases such as sequence length. More advanced alignment algorithms provide greater accuracy at the cost of increased computational resources.
 
 \end{document}
